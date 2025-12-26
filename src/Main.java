@@ -22,7 +22,6 @@ public class Main {
         ctx.registerBean("userService", userServiceDef);
 
 
-
         // refresh context to initialize singleton beans
         ctx.refresh();
 

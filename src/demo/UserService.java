@@ -1,12 +1,11 @@
 package demo;
 
-public class UserService {
-    private final UserRepository repo;
+import core.annotations.Autowired;
 
-    // constructor injection (our container will pick this)
-    public UserService(UserRepository repo) {
-        this.repo = repo;
-    }
+public class UserService {
+
+    @Autowired
+    private UserRepository repo;
 
     public void init() {
         System.out.println("UserService init()");
