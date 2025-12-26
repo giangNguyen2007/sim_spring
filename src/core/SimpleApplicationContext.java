@@ -1,5 +1,7 @@
 package core;
 
+import core.bpp.aware.AwareBeanPostProcessor;
+
 public class SimpleApplicationContext {
 
     private final SimpleBeanFactory beanFactory = new SimpleBeanFactory();
@@ -10,10 +12,29 @@ public class SimpleApplicationContext {
         beanFactory.registerBeanDefinition(name, def);
     }
 
-    // initialize all singletons beans
+    // main engine method
     public void refresh() {
         if (refreshed) return;
+
+        // ============================================================
+        // Phase 0) Register built-in BeanPostProcessors (infrastructure)
+        // ------------------------------------------------------------
+        // gng : Spring registers some internal BPPs by default.
+        // We start with the "Aware" processor.
+        // ============================================================
+        beanFactory.addBeanPostProcessor(new AwareBeanPostProcessor(beanFactory));
+
+        // ============================================================
+        // Phase 1) Register user-defined BeanPostProcessor beans
+        // ------------------------------------------------------------
+        // gng : must happen BEFORE preInstantiateSingletons()
+        // ============================================================
+        beanFactory.registerBeanPostProcessors();
+
+
         beanFactory.preInstantiateSingletons();
+
+
         refreshed = true;
     }
 

@@ -1,4 +1,6 @@
-package core;
+package core.interfaces;
+
+import core.BeanDefinition;
 
 public interface BeanFactory {
     void registerBeanDefinition(String name, BeanDefinition def);

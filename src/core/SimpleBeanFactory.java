@@ -14,6 +14,8 @@ package core;
 //We start with constructor injection by type, picking the “best” constructor (we’ll keep it simple).
 
 import core.annotations.Autowired;
+import core.interfaces.BeanFactory;
+import core.interfaces.BeanPostProcessor;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -24,7 +26,7 @@ import java.util.*;
 public class SimpleBeanFactory implements BeanFactory {
 
     // main registry for bean definitions
-    private final Map<String, BeanDefinition> definitions = new HashMap<>();
+    private final Map<String, BeanDefinition> beanDefinitionRegistry = new HashMap<>();
 
     // ==========================================================
     // Section 2) Singleton caches (Spring-like 3-level cache)
@@ -48,6 +50,13 @@ public class SimpleBeanFactory implements BeanFactory {
     // destruction callbacks
     private final Map<String, Runnable> destroyCallbacks = new LinkedHashMap<>();
 
+
+    // ==========================================================
+    // Section 2.5) BeanPostProcessors registry
+    // ==========================================================
+    // gng : Keep a list of post processors (AOP/proxy hooks)
+    private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
+
     // ========================= END OF FIELDS =========================
 
     /**
@@ -61,17 +70,52 @@ public class SimpleBeanFactory implements BeanFactory {
 
 
     // ==========================================================
-    // Section 3) BeanDefinition registration
+    // Section 3) BeanDefinition registration and BeanPostProcessor API
     // ==========================================================
     @Override
     public void registerBeanDefinition(String name, BeanDefinition def) {
         // objectif : registrer une definition de bean
 
 
-        if (definitions.containsKey(name)) {
+        if (beanDefinitionRegistry.containsKey(name)) {
             throw new IllegalArgumentException("Duplicate bean name: " + name);
         }
-        definitions.put(name, def);
+        beanDefinitionRegistry.put(name, def);
+    }
+
+
+    /**
+     * Auto-detect and register all BeanPostProcessor beans.
+     *
+     * IMPORTANT:
+     * - must run BEFORE preInstantiateSingletons()
+     * - otherwise BPP will NOT apply to eagerly-created singletons
+     */
+    public void registerBeanPostProcessors() {
+        List<String> bppNames = new ArrayList<>();
+
+        // Find all beans that is a BeanPostProcessor
+        for (var e : beanDefinitionRegistry.entrySet()) {
+            if (BeanPostProcessor.class.isAssignableFrom(e.getValue().getBeanClass())) {
+                bppNames.add(e.getKey());
+            }
+        }
+
+        // Instantiate and register them
+        for (String name : bppNames) {
+            Object bean = getBean(name);
+            this.addBeanPostProcessor((BeanPostProcessor) bean);
+        }
+    }
+
+    /**
+     * Register a BeanPostProcessor manually (optional helper).
+     *
+     * In a real container, BPPs are usually registered during refresh().
+     */
+    public void addBeanPostProcessor(BeanPostProcessor bpp) {
+        if (bpp == null) throw new IllegalArgumentException("bpp must not be null");
+        this.beanPostProcessors.add(bpp);
     }
 
 
@@ -83,7 +127,7 @@ public class SimpleBeanFactory implements BeanFactory {
     // get bean by name
     public Object getBean(String name) {
 
-        BeanDefinition def = definitions.get(name);
+        BeanDefinition def = beanDefinitionRegistry.get(name);
         if (def == null) throw new NoSuchElementException("No bean named: " + name);
 
         // if singleton
@@ -121,7 +165,7 @@ public class SimpleBeanFactory implements BeanFactory {
         List<String> matches = new ArrayList<>();
 
         // definition.entrySet() => set of BeanDefinition object
-        for (var e : definitions.entrySet()) {
+        for (var e : beanDefinitionRegistry.entrySet()) {
             if (type.isAssignableFrom(e.getValue().getBeanClass())) {
                 matches.add(e.getKey());
             }
@@ -136,7 +180,7 @@ public class SimpleBeanFactory implements BeanFactory {
     // => call getBean(name) for each singleton definition
 
     public void preInstantiateSingletons() {
-        for (var e : definitions.entrySet()) {
+        for (var e : beanDefinitionRegistry.entrySet()) {
             if (e.getValue().isSingleton()) {
                 getBean(e.getKey());
             }
@@ -208,8 +252,28 @@ public class SimpleBeanFactory implements BeanFactory {
      * Hook point: in real Spring this may return a proxy instead of the raw bean.
      * For now, we just return the instance itself.
      */
+
+
+    /**
+     *
+     * gng : We now route this through BeanPostProcessors.getEarlyBeanReference(...)
+     * so a processor can expose a proxy EARLY (important for circular references).
+     */
     protected Object getEarlyBeanReference(String name, Object bean) {
-        return bean;
+        // In real Spring, this is where AOP proxies may be created early.
+        // Here, we delegate to BeanPostProcessors.
+        Object exposed = bean;
+        for (BeanPostProcessor bpp : beanPostProcessors) {
+
+            // return either the same bean or a proxy/wrapper
+            exposed = bpp.getEarlyBeanReference(exposed, name);
+            if (exposed == null) {
+                throw new IllegalStateException(
+                        "BeanPostProcessor '" + bpp.getClass().getName() + "' returned null from getEarlyBeanReference for bean '" + name + "'"
+                );
+            }
+        }
+        return exposed;
     }
 
     // ==========================================================
@@ -252,27 +316,38 @@ public class SimpleBeanFactory implements BeanFactory {
             // gng : inject dependencies (field + setter injection)
             this.populateBean(name, instance);
 
-            // once dependencies are injected, call init methods
+            // --------------------------------------------
+            // Step 3) BeanPostProcessor - before init
+            // --------------------------------------------
+            // gng : BPP can validate or wrap the bean before init.
+            Object exposedObject = applyBeanPostProcessorsBeforeInitialization(instance, name);
+
 
             // --------------------------------------------
             // Step 3) Init callbacks
             // --------------------------------------------
-            this.invokeInit(instance, def);
+            this.invokeInit(exposedObject, def);
+
 
             // --------------------------------------------
-            // Step 4) Register destroy callback (if any)
+            // Step 5) BeanPostProcessor - after init (AOP proxy hook)
+            // --------------------------------------------
+            exposedObject = applyBeanPostProcessorsAfterInitialization(exposedObject, name);
+
+            // --------------------------------------------
+            // Step 6) Register destroy callback (if any)
             // --------------------------------------------
             // Spring usually registers this for singletons, but you can keep it for all scopes.
-            this.registerDestroyCallbackIfAny(name, instance, def);
+            this.registerDestroyCallbackIfAny(name, exposedObject, def);
 
             // --------------------------------------------
-            // Step 5) Publish singleton (move to L1)
+            // Step 7) Publish singleton (move to L1)
             // --------------------------------------------
             if (isSingleton) {
-                this.addSingletonToL1(name, instance);
+                this.addSingletonToL1(name, exposedObject);
             }
 
-            return instance;
+            return exposedObject;
 
         } catch (Exception e) {
             throw new RuntimeException(
@@ -436,6 +511,37 @@ public class SimpleBeanFactory implements BeanFactory {
                             " (type: " + depType.getName() + ")", ex
             );
         }
+    }
+
+
+    // ==========================================================
+    // Section 9.5) Apply BeanPostProcessors
+    // ==========================================================
+
+    private Object applyBeanPostProcessorsBeforeInitialization(Object bean, String beanName) {
+        Object result = bean;
+        for (BeanPostProcessor bpp : beanPostProcessors) {
+            result = bpp.postProcessBeforeInitialization(result, beanName);
+            if (result == null) {
+                throw new IllegalStateException(
+                        "BeanPostProcessor '" + bpp.getClass().getName() + "' returned null from postProcessBeforeInitialization for bean '" + beanName + "'"
+                );
+            }
+        }
+        return result;
+    }
+
+    private Object applyBeanPostProcessorsAfterInitialization(Object bean, String beanName) {
+        Object result = bean;
+        for (BeanPostProcessor bpp : beanPostProcessors) {
+            result = bpp.postProcessAfterInitialization(result, beanName);
+            if (result == null) {
+                throw new IllegalStateException(
+                        "BeanPostProcessor '" + bpp.getClass().getName() + "' returned null from postProcessAfterInitialization for bean '" + beanName + "'"
+                );
+            }
+        }
+        return result;
     }
 
 
