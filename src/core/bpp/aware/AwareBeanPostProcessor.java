@@ -1,7 +1,7 @@
 package core.bpp.aware;
 
-import core.interfaces.BeanFactory;
-import core.interfaces.BeanPostProcessor;
+import core.interfaces.BeanFactoryInterface;
+import core.interfaces.BeanPostProcessorInterface;
 
 /**
  * AwareBeanPostProcessor (built-in)
@@ -16,11 +16,11 @@ import core.interfaces.BeanPostProcessor;
  * - after dependencies are injected (populateBean)
  * - before init-method runs
  */
-public class AwareBeanPostProcessor implements BeanPostProcessor {
+public class AwareBeanPostProcessor implements BeanPostProcessorInterface {
 
-    private final BeanFactory beanFactory;
+    private final BeanFactoryInterface beanFactory;
 
-    public AwareBeanPostProcessor(BeanFactory beanFactory) {
+    public AwareBeanPostProcessor(BeanFactoryInterface beanFactory) {
         if (beanFactory == null) throw new IllegalArgumentException("beanFactory must not be null");
         this.beanFactory = beanFactory;
     }

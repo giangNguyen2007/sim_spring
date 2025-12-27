@@ -38,6 +38,6 @@ public class BeanDefinition {
     public String getInitMethod() { return initMethod; }
     public void setInitMethod(String initMethod) { this.initMethod = initMethod; }
 
-    public String getDestroyMethod() { return destroyMethod; }
+    public String getDestroyMethodName() { return destroyMethod; }
     public void setDestroyMethod(String destroyMethod) { this.destroyMethod = destroyMethod; }
 }

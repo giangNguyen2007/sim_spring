@@ -9,7 +9,7 @@ package core.interfaces;
  * In real Spring, there are many sub-interfaces (Aware, SmartInstantiationAware, etc.).
  * For our mini-container, we keep ONE interface, with default methods.
  */
-public interface BeanPostProcessor {
+public interface BeanPostProcessorInterface {
 
     /**
      * Called after dependency injection (populateBean), but BEFORE init-method.

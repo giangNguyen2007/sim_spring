@@ -2,7 +2,7 @@ package core.interfaces;
 
 import core.BeanDefinition;
 
-public interface BeanFactory {
+public interface BeanFactoryInterface {
     void registerBeanDefinition(String name, BeanDefinition def);
 
     Object getBean(String name);

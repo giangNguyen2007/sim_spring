@@ -1,5 +1,6 @@
 import core.BeanDefinition;
 import core.SimpleApplicationContext;
+import demo.LifecycleDemoService;
 import demo.UserRepository;
 import demo.UserService;
 
@@ -8,10 +9,12 @@ import demo.UserService;
 public class Main {
     public static void main(String[] args) {
 
-        SimpleApplicationContext ctx = new SimpleApplicationContext();
+        SimpleApplicationContext appCtx = new SimpleApplicationContext();
+
+        // ============== REGISTER BEAN DEFINITIONS ===============
 
         // register UserRepository bean
-        ctx.registerBean("userRepository", new BeanDefinition(UserRepository.class));
+        appCtx.registerBean("userRepository", new BeanDefinition(UserRepository.class));
 
 
         // register UserService bean with init and destroy methods
@@ -19,16 +22,26 @@ public class Main {
         userServiceDef.setInitMethod("init");
         userServiceDef.setDestroyMethod("destroy");
 
-        ctx.registerBean("userService", userServiceDef);
+        appCtx.registerBean("userService", userServiceDef);
+
+        // register LifeCycleDemoService bean with init and destroy methods
+        BeanDefinition demoServiceDef = new BeanDefinition(LifecycleDemoService.class);
+        demoServiceDef.setInitMethod("init");
+        demoServiceDef.setDestroyMethod("destroy");
+
+        appCtx.registerBean("lifecycleDemoService", demoServiceDef);
+
+        // =============== RUN THE CONTEXT ===============
 
 
         // refresh context to initialize singleton beans
-        ctx.refresh();
+        appCtx.refresh();
 
-        UserService service = ctx.getBean(UserService.class);
+        UserService service = appCtx.getBean(UserService.class);
         System.out.println(service.getName(42));
 
-        ctx.close();
+        // close context to trigger destruction callbacks
+        appCtx.close();
 
 
     }

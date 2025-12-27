@@ -1,5 +1,7 @@
 package core;
 
+import core.bpp.common_annotations.PostConstructBeanPostProcessor;
+import core.bpp.common_annotations.PreDestroyBeanPostProcessor;
 import core.bpp.aware.AwareBeanPostProcessor;
 
 public class SimpleApplicationContext {
@@ -24,6 +26,9 @@ public class SimpleApplicationContext {
         // ============================================================
         beanFactory.addBeanPostProcessor(new AwareBeanPostProcessor(beanFactory));
 
+        beanFactory.addBeanPostProcessor(new PostConstructBeanPostProcessor()); // gng : @PostConstruct
+        beanFactory.addBeanPostProcessor(new PreDestroyBeanPostProcessor());
+
         // ============================================================
         // Phase 1) Register user-defined BeanPostProcessor beans
         // ------------------------------------------------------------
@@ -47,6 +52,7 @@ public class SimpleApplicationContext {
     }
 
     public void close() {
+
         beanFactory.close();
     }
 }

@@ -14,8 +14,9 @@ package core;
 //We start with constructor injection by type, picking the “best” constructor (we’ll keep it simple).
 
 import core.annotations.Autowired;
-import core.interfaces.BeanFactory;
-import core.interfaces.BeanPostProcessor;
+import core.interfaces.BeanFactoryInterface;
+import core.interfaces.BeanPostProcessorInterface;
+import core.interfaces.DestructionAwareBeanPostProcessorInterface;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -23,7 +24,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
-public class SimpleBeanFactory implements BeanFactory {
+public class SimpleBeanFactory implements BeanFactoryInterface {
 
     // main registry for bean definitions
     private final Map<String, BeanDefinition> beanDefinitionRegistry = new HashMap<>();
@@ -55,7 +56,7 @@ public class SimpleBeanFactory implements BeanFactory {
     // Section 2.5) BeanPostProcessors registry
     // ==========================================================
     // gng : Keep a list of post processors (AOP/proxy hooks)
-    private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
+    private final List<BeanPostProcessorInterface> beanPostProcessors = new ArrayList<>();
 
     // ========================= END OF FIELDS =========================
 
@@ -96,7 +97,7 @@ public class SimpleBeanFactory implements BeanFactory {
 
         // Find all beans that is a BeanPostProcessor
         for (var e : beanDefinitionRegistry.entrySet()) {
-            if (BeanPostProcessor.class.isAssignableFrom(e.getValue().getBeanClass())) {
+            if (BeanPostProcessorInterface.class.isAssignableFrom(e.getValue().getBeanClass())) {
                 bppNames.add(e.getKey());
             }
         }
@@ -104,7 +105,7 @@ public class SimpleBeanFactory implements BeanFactory {
         // Instantiate and register them
         for (String name : bppNames) {
             Object bean = getBean(name);
-            this.addBeanPostProcessor((BeanPostProcessor) bean);
+            this.addBeanPostProcessor((BeanPostProcessorInterface) bean);
         }
     }
 
@@ -113,7 +114,7 @@ public class SimpleBeanFactory implements BeanFactory {
      *
      * In a real container, BPPs are usually registered during refresh().
      */
-    public void addBeanPostProcessor(BeanPostProcessor bpp) {
+    public void addBeanPostProcessor(BeanPostProcessorInterface bpp) {
         if (bpp == null) throw new IllegalArgumentException("bpp must not be null");
         this.beanPostProcessors.add(bpp);
     }
@@ -187,6 +188,7 @@ public class SimpleBeanFactory implements BeanFactory {
         }
     }
 
+    // call bean's registered destroy methods
     public void close() {
         // destroy in reverse registration order like a stack (simple approach)
         List<Runnable> callbacks = new ArrayList<>(destroyCallbacks.values());
@@ -263,7 +265,7 @@ public class SimpleBeanFactory implements BeanFactory {
         // In real Spring, this is where AOP proxies may be created early.
         // Here, we delegate to BeanPostProcessors.
         Object exposed = bean;
-        for (BeanPostProcessor bpp : beanPostProcessors) {
+        for (BeanPostProcessorInterface bpp : beanPostProcessors) {
 
             // return either the same bean or a proxy/wrapper
             exposed = bpp.getEarlyBeanReference(exposed, name);
@@ -520,7 +522,7 @@ public class SimpleBeanFactory implements BeanFactory {
 
     private Object applyBeanPostProcessorsBeforeInitialization(Object bean, String beanName) {
         Object result = bean;
-        for (BeanPostProcessor bpp : beanPostProcessors) {
+        for (BeanPostProcessorInterface bpp : beanPostProcessors) {
             result = bpp.postProcessBeforeInitialization(result, beanName);
             if (result == null) {
                 throw new IllegalStateException(
@@ -533,7 +535,7 @@ public class SimpleBeanFactory implements BeanFactory {
 
     private Object applyBeanPostProcessorsAfterInitialization(Object bean, String beanName) {
         Object result = bean;
-        for (BeanPostProcessor bpp : beanPostProcessors) {
+        for (BeanPostProcessorInterface bpp : beanPostProcessors) {
             result = bpp.postProcessAfterInitialization(result, beanName);
             if (result == null) {
                 throw new IllegalStateException(
@@ -558,18 +560,71 @@ public class SimpleBeanFactory implements BeanFactory {
     }
 
     private void registerDestroyCallbackIfAny(String name, Object instance, BeanDefinition def) {
-        String destroy = def.getDestroyMethod();
-        if (destroy == null || destroy.isBlank()) return;
 
+        // retrieve bean's destroy method name registered in BeanDefinition
+        String destroy = def.getDestroyMethodName();
+        boolean hasDestroyMethod = (destroy != null && !destroy.isBlank());
+
+        // gng : This makes @PreDestroy work:
+        // PreDestroyBeanPostProcessor.requiresDestruction(bean) will return true
+        // if the bean has @PreDestroy methods.
+        boolean needsDestructionBpp = requiresDestructionByPostProcessors(instance);
+
+        // nothing to do => no destroy callback
+        if (!(hasDestroyMethod || needsDestructionBpp)) return;
+
+        // register a callback which will
+        // (1) invoke Destruction-aware BPPs => apply @PreDestroy methods
+        // (2) invoke the destroy method via reflection
         destroyCallbacks.put(name, () -> {
-            try {
-                Method m = instance.getClass().getMethod(destroy);
-                m.setAccessible(true);
-                m.invoke(instance);
-            } catch (Exception e) {
-                throw new RuntimeException("Destroy method failed for bean: " + name, e);
+
+            // 1) Destruction-aware processors first (ex: @PreDestroy)
+            applyBeanPostProcessorsBeforeDestruction(instance, name);
+
+            // 2) BeanDefinition.destroyMethod (if configured)
+            if (hasDestroyMethod) {
+                try {
+                    Method m = instance.getClass().getMethod(destroy);
+                    m.setAccessible(true);
+                    m.invoke(instance);
+                } catch (Exception e) {
+                    throw new RuntimeException("Destroy method failed for bean: " + name, e);
+                }
             }
         });
+    }
+
+    // ==========================================================
+    // Destruction-aware BPP support
+    // ==========================================================
+
+    // check if this bean requires destruction by any registered BPP
+    private boolean requiresDestructionByPostProcessors(Object bean) {
+        for (BeanPostProcessorInterface bpp : beanPostProcessors) {
+
+            // if a BPP is of type DestructionAwareBeanPostProcessor
+            if (bpp instanceof DestructionAwareBeanPostProcessorInterface) {
+
+                // check if the bean has methods annotated with @PreDestroy
+                if (((DestructionAwareBeanPostProcessorInterface) bpp).requiresDestruction(bean)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void applyBeanPostProcessorsBeforeDestruction(Object bean, String beanName) {
+        for (BeanPostProcessorInterface bpp : beanPostProcessors) {
+            if (bpp instanceof DestructionAwareBeanPostProcessorInterface) {
+                DestructionAwareBeanPostProcessorInterface dbpp = (DestructionAwareBeanPostProcessorInterface) bpp;
+                if (dbpp.requiresDestruction(bean)) {
+
+                    // apply @PreDestroy methods
+                    dbpp.postProcessBeforeDestruction(bean, beanName);
+                }
+            }
+        }
     }
 
 
