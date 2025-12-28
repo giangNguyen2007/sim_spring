@@ -15,13 +15,10 @@ package core;
 
 import core.annotations.Autowired;
 import core.interfaces.BeanFactoryInterface;
-import core.interfaces.BeanPostProcessorInterface;
-import core.interfaces.DestructionAwareBeanPostProcessorInterface;
+import core.bpp.interfaces.BeanPostProcessorInterface;
+import core.bpp.interfaces.DestructionAwareBeanPostProcessorInterface;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.util.*;
 
 public class SimpleBeanFactory implements BeanFactoryInterface {
@@ -524,12 +521,14 @@ public class SimpleBeanFactory implements BeanFactoryInterface {
         Object result = bean;
         for (BeanPostProcessorInterface bpp : beanPostProcessors) {
             result = bpp.postProcessBeforeInitialization(result, beanName);
+
             if (result == null) {
                 throw new IllegalStateException(
                         "BeanPostProcessor '" + bpp.getClass().getName() + "' returned null from postProcessBeforeInitialization for bean '" + beanName + "'"
                 );
             }
         }
+
         return result;
     }
 
@@ -537,6 +536,15 @@ public class SimpleBeanFactory implements BeanFactoryInterface {
         Object result = bean;
         for (BeanPostProcessorInterface bpp : beanPostProcessors) {
             result = bpp.postProcessAfterInitialization(result, beanName);
+
+            if (bpp instanceof core.bpp.AopAutoProxyCreatorPostProcessor){
+
+                System.out.println("bean processed by AopAutoProxyCreatorPostProcessor");
+
+            }
+
+            System.out.println("[BPP Before Init] : " + beanName + " => " + result.getClass().getName());
+
             if (result == null) {
                 throw new IllegalStateException(
                         "BeanPostProcessor '" + bpp.getClass().getName() + "' returned null from postProcessAfterInitialization for bean '" + beanName + "'"

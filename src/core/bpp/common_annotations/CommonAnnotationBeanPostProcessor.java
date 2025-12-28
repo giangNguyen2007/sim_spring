@@ -1,7 +1,7 @@
 package core.bpp.common_annotations;
 
 import core.annotations.PostConstruct;
-import core.interfaces.BeanPostProcessorInterface;
+import core.bpp.interfaces.BeanPostProcessorInterface;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;

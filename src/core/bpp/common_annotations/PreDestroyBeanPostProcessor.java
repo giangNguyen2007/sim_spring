@@ -2,7 +2,7 @@ package core.bpp.common_annotations;
 
 
 import core.annotations.PreDestroy;
-import core.interfaces.DestructionAwareBeanPostProcessorInterface;
+import core.bpp.interfaces.DestructionAwareBeanPostProcessorInterface;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
