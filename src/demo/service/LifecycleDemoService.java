@@ -1,4 +1,4 @@
-package demo;
+package demo.service;
 
 import core.annotations.PostConstruct;
 import core.annotations.PreDestroy;

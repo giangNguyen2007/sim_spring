@@ -1,9 +1,9 @@
-package core.factory;
+package core.factory.factory_post_processors;
 
 import core.aop.advisors.AdvisorInterface;
 import core.aop.annotations.Aspect;
 import core.bpp.AopAutoProxyCreatorPostProcessor;
-import core.interfaces.BeanFactoryPostProcessor;
+import core.factory.SimpleBeanFactory;
 
 import java.util.List;
 

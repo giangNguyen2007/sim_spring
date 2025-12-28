@@ -1,4 +1,4 @@
-package core.interfaces;
+package core.factory.factory_post_processors;
 
 import core.factory.SimpleBeanFactory;
 

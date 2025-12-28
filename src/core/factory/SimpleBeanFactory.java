@@ -83,6 +83,14 @@ public class SimpleBeanFactory implements BeanFactoryInterface {
         beanDefinitionRegistry.put(name, def);
     }
 
+    public boolean containsBeanDefinition(String name) {
+        return this.beanDefinitionRegistry.containsKey(name);
+    }
+
+    public Set<String> getBeanDefinitionNames() {
+        return Collections.unmodifiableSet(this.beanDefinitionRegistry.keySet());
+    }
+
 
     /**
      * Auto-detect and register all BeanPostProcessor beans.

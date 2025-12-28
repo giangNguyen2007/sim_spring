@@ -1,21 +1,10 @@
-package core;
+package core.context;
 
-import core.aop.advisors.AdvisorInterface;
-import core.aop.advisors.DefaultPointcutAdvisor;
-import core.aop.interceptor.LoggingInterceptor;
-import core.aop.interceptor.MethodInterceptorInterface;
-import core.aop.interceptor.TransactionInterceptor;
-import core.aop.pointcut.AnnotationTransactionPointcut;
-import core.aop.pointcut.NameMatchMethodPointcut;
-import core.aop.pointcut.PointCutInterface;
-import core.aop.transaction.SimpleTransactionManager;
-import core.aop.transaction.TransactionManagerInterface;
-import core.bpp.AopAutoProxyCreatorPostProcessor;
-import core.bpp.common_annotations.PostConstructBeanPostProcessor;
-import core.bpp.common_annotations.PreDestroyBeanPostProcessor;
-import core.bpp.aware.AwareBeanPostProcessor;
-import core.interfaces.BeanFactoryPostProcessor;
+import core.BeanDefinition;
+import core.factory.factory_post_processors.AspectJAutoProxyRegistrarBFPP;
+import core.factory.factory_post_processors.BeanFactoryPostProcessor;
 import core.factory.SimpleBeanFactory;
+import core.factory.factory_post_processors.ComponentScanFactoryPostProcessor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,20 +14,30 @@ public class SimpleApplicationContext {
     private final SimpleBeanFactory beanFactory = new SimpleBeanFactory();
 
     // Programmatically registered post processors (like Spring's addBeanFactoryPostProcessor)
-    private final List<BeanFactoryPostProcessor> beanFactoryPostProcessors = new ArrayList<>();
+    private final List<BeanFactoryPostProcessor> beanFactoryPostProcessorsList = new ArrayList<>();
     private boolean refreshed = false;
+
+    public SimpleApplicationContext(String... basePackages) {
+        // Register scanning BFPP FIRST
+        beanFactoryPostProcessorsList.add(new ComponentScanFactoryPostProcessor(List.of(basePackages),
+                Thread.currentThread().getContextClassLoader()));
+
+        // Later, you add other BFPPs (AOP aspect registrar, @Configuration parser, ...)
+        // bfpps.add(new AspectJAutoProxyRegistrar());
+
+        //beanFactoryPostProcessorsList.add(new AspectJAutoProxyRegistrarBFPP());
+    }
+
+
 
     public void registerBean(String name, BeanDefinition def) {
         if (refreshed) throw new IllegalStateException("Context already refreshed");
         beanFactory.registerBeanDefinition(name, def);
     }
 
-    public void addBeanFactoryPostProcessor(BeanFactoryPostProcessor bfpp) {
-        this.beanFactoryPostProcessors.add(bfpp);
-    }
 
     private void invokeBeanFactoryPostProcessors() {
-        for (BeanFactoryPostProcessor bfpp : beanFactoryPostProcessors) {
+        for (BeanFactoryPostProcessor bfpp : beanFactoryPostProcessorsList) {
             bfpp.postProcessBeanFactory(beanFactory);
         }
 
@@ -58,7 +57,7 @@ public class SimpleApplicationContext {
 
         // ======================= pass BeanFactory by FactoryPostProcessors ===============
         // for clarity, write code instead of calling invokeBeanFactoryPostProcessors()
-        for (BeanFactoryPostProcessor bfpp : beanFactoryPostProcessors) {
+        for (BeanFactoryPostProcessor bfpp : beanFactoryPostProcessorsList) {
             bfpp.postProcessBeanFactory(beanFactory);
         }
 

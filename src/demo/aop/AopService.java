@@ -1,4 +1,4 @@
-package demo;
+package demo.aop;
 
 public class AopService implements AopInterface {
 
