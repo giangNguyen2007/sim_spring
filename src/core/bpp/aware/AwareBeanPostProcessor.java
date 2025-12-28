@@ -1,6 +1,6 @@
 package core.bpp.aware;
 
-import core.interfaces.BeanFactoryInterface;
+import core.factory.BeanFactoryInterface;
 import core.bpp.interfaces.BeanPostProcessorInterface;
 
 /**

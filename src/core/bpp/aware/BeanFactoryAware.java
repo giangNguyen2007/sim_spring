@@ -1,7 +1,7 @@
 package core.bpp.aware;
 
 
-import core.interfaces.BeanFactoryInterface;
+import core.factory.BeanFactoryInterface;
 
 /**
  * BeanFactoryAware

@@ -1,6 +1,8 @@
 import core.BeanDefinition;
 import core.SimpleApplicationContext;
+import core.aop.aspects.LoggingAspect;
 import core.aop.proxy.JdkDynamicAopProxy;
+import core.factory.AspectJAutoProxyRegistrarBFPP;
 import demo.AopInterface;
 import demo.AopService;
 import demo.AopTransactionInterface;
@@ -18,10 +20,19 @@ public class Main {
 
         // ============== REGISTER BEAN DEFINITIONS ===============
 
+        // register aspect bean
+        // annotated with @Aspect => will be processed by AspectJAutoProxyRegistrarBFPP
+        // loggingAspect => log Around for classes with name containing "Service"
+        appCtx.registerBean("loggingAspect", new BeanDefinition(LoggingAspect.class));
+
         // register UserRepository bean
+
         appCtx.registerBean("aopService", new BeanDefinition(AopService.class));
 
-        appCtx.registerBean("aopTransactionService", new BeanDefinition(AopTransactionService.class));
+
+        // ================== Register Factory Post Processors ==================
+        // Add BFPP that generates advisors from @Aspect beans
+        appCtx.addBeanFactoryPostProcessor(new AspectJAutoProxyRegistrarBFPP());
 
         // =============== RUN THE CONTEXT ===============
 
@@ -41,18 +52,6 @@ public class Main {
         }
 
         bean.pay(100);
-
-        // invoke method with @Transactional
-        AopTransactionInterface txBean = appCtx.getBean(AopTransactionInterface.class);
-
-        if (Proxy.isProxyClass(txBean.getClass())) {
-            Object handler = Proxy.getInvocationHandler(txBean);
-            System.out.println("handler = " + handler.getClass().getName());
-
-            boolean isOurAop2 = handler instanceof JdkDynamicAopProxy;
-            System.out.println("isOurAop=" + isOurAop2);
-        }
-        txBean.processTransaction(50);
 
         // close context to trigger destruction callbacks
         appCtx.close();

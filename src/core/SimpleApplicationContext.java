@@ -14,10 +14,18 @@ import core.bpp.AopAutoProxyCreatorPostProcessor;
 import core.bpp.common_annotations.PostConstructBeanPostProcessor;
 import core.bpp.common_annotations.PreDestroyBeanPostProcessor;
 import core.bpp.aware.AwareBeanPostProcessor;
+import core.interfaces.BeanFactoryPostProcessor;
+import core.factory.SimpleBeanFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class SimpleApplicationContext {
 
     private final SimpleBeanFactory beanFactory = new SimpleBeanFactory();
+
+    // Programmatically registered post processors (like Spring's addBeanFactoryPostProcessor)
+    private final List<BeanFactoryPostProcessor> beanFactoryPostProcessors = new ArrayList<>();
     private boolean refreshed = false;
 
     public void registerBean(String name, BeanDefinition def) {
@@ -25,9 +33,34 @@ public class SimpleApplicationContext {
         beanFactory.registerBeanDefinition(name, def);
     }
 
+    public void addBeanFactoryPostProcessor(BeanFactoryPostProcessor bfpp) {
+        this.beanFactoryPostProcessors.add(bfpp);
+    }
+
+    private void invokeBeanFactoryPostProcessors() {
+        for (BeanFactoryPostProcessor bfpp : beanFactoryPostProcessors) {
+            bfpp.postProcessBeanFactory(beanFactory);
+        }
+
+        // B) (optional) BFPPs declared as beans
+        // If you support it, you can discover and instantiate them here.
+        // Example:
+        // for (String name : beanFactory.getBeanNamesForType(BeanFactoryPostProcessor.class)) {
+        //     BeanFactoryPostProcessor bfppBean = beanFactory.getBean(name, BeanFactoryPostProcessor.class);
+        //     bfppBean.postProcessBeanFactory(beanFactory);
+        // }
+    }
+
     // main engine method
     public void refresh() {
         if (refreshed) return;
+
+
+        // ======================= pass BeanFactory by FactoryPostProcessors ===============
+        // for clarity, write code instead of calling invokeBeanFactoryPostProcessors()
+        for (BeanFactoryPostProcessor bfpp : beanFactoryPostProcessors) {
+            bfpp.postProcessBeanFactory(beanFactory);
+        }
 
         // ============================================================
         // Phase 0) Register built-in BeanPostProcessors (infrastructure)
@@ -35,44 +68,10 @@ public class SimpleApplicationContext {
         // gng : Spring registers some internal BPPs by default.
         // We start with the "Aware" processor.
         // ============================================================
-        beanFactory.addBeanPostProcessor(new AwareBeanPostProcessor(beanFactory));
-
-        beanFactory.addBeanPostProcessor(new PostConstructBeanPostProcessor()); // gng : @PostConstruct
-        beanFactory.addBeanPostProcessor(new PreDestroyBeanPostProcessor());
-
-        // =============== add AOP BPP (logging) ======================
-
-        AopAutoProxyCreatorPostProcessor apc = new AopAutoProxyCreatorPostProcessor();
-
-        // build an advisor: match methods by name, apply logging
-        NameMatchMethodPointcut pc = new NameMatchMethodPointcut("Service")
-                .addMethodName("placeOrder")
-                .addMethodName("pay");
-
-        LoggingInterceptor loggingInterceptor = new LoggingInterceptor();
-
-        // any class with name containing "service"
-        // in this class, method named "pay", "placeOrder" will be intercepted by the logging interceptor
-        AdvisorInterface loggingAdvisor = new DefaultPointcutAdvisor(pc, loggingInterceptor);
-        apc.addAdvisor(loggingAdvisor);
-
-
-        // =============== add AOP BPP (Transaction) ======================
-
-
-        // Create transaction infrastructure
-        TransactionManagerInterface txManager = new SimpleTransactionManager();
-        MethodInterceptorInterface txInterceptor = new TransactionInterceptor(txManager);
-
-        // Create advisor: @Transactional pointcut + tx interceptor
-        PointCutInterface txPointcut = new AnnotationTransactionPointcut();
-        // create advisor
-        AdvisorInterface txAdvisor = new DefaultPointcutAdvisor(txPointcut, txInterceptor);
-
-        apc.addAdvisor(txAdvisor);
-
-        // register as a BeanPostProcessor in your factory
-        beanFactory.addBeanPostProcessor(apc);
+//        beanFactory.addBeanPostProcessor(new AwareBeanPostProcessor(beanFactory));
+//
+//        beanFactory.addBeanPostProcessor(new PostConstructBeanPostProcessor()); // gng : @PostConstruct
+//        beanFactory.addBeanPostProcessor(new PreDestroyBeanPostProcessor()); // gng : @PreDestroy
 
         // ============================================================
         // Phase 1) Register user-defined BeanPostProcessor beans

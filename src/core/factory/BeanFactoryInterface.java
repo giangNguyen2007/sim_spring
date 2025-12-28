@@ -1,4 +1,4 @@
-package core.interfaces;
+package core.factory;
 
 import core.BeanDefinition;
 

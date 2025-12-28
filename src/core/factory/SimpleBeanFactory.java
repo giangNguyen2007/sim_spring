@@ -1,4 +1,4 @@
-package core;
+package core.factory;
 
 
 //This is the “engine” that:
@@ -13,11 +13,13 @@ package core;
 //
 //We start with constructor injection by type, picking the “best” constructor (we’ll keep it simple).
 
+import core.BeanDefinition;
 import core.annotations.Autowired;
-import core.interfaces.BeanFactoryInterface;
+import core.bpp.AopAutoProxyCreatorPostProcessor;
 import core.bpp.interfaces.BeanPostProcessorInterface;
 import core.bpp.interfaces.DestructionAwareBeanPostProcessorInterface;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -633,6 +635,38 @@ public class SimpleBeanFactory implements BeanFactoryInterface {
                 }
             }
         }
+    }
+
+    // ==========================================================
+
+    public AopAutoProxyCreatorPostProcessor getOrCreateAopAutoProxyCreator() {
+        for (BeanPostProcessorInterface bpp : this.beanPostProcessors) {
+            if (bpp instanceof AopAutoProxyCreatorPostProcessor apc) {
+                return apc;
+            }
+        }
+
+        // Create and register infrastructure BPP
+        AopAutoProxyCreatorPostProcessor apc = new AopAutoProxyCreatorPostProcessor();
+        this.addBeanPostProcessor(apc);
+        return apc;
+    }
+
+    // return a list of bean names whose classes are annotated with the given annotation
+    public List<String> findBeanNamesByAnnotation(Class<? extends Annotation> ann) {
+        List<String> names = new ArrayList<>();
+
+        for (Map.Entry<String, BeanDefinition> e : this.beanDefinitionRegistry.entrySet()) {
+            BeanDefinition bd = e.getValue();
+
+            // Assumption: your BeanDefinition can expose its class.
+            // If you use Supplier/factory methods, you may not know class early.
+            Class<?> type = bd.getBeanClass();
+            if (type != null && type.isAnnotationPresent(ann)) {
+                names.add(e.getKey());
+            }
+        }
+        return names;
     }
 
 
