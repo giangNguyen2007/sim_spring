@@ -1,5 +1,6 @@
 import core.context.SimpleApplicationContext;
 import core.aop.proxy.JdkDynamicAopProxy;
+import demo.AppConfig;
 import demo.aop.AopInterface;
 import demo.service.UserService;
 
@@ -11,8 +12,9 @@ import java.lang.reflect.Proxy;
 public class Main {
     public static void main(String[] args) {
         // =============== CREATE APPLICATION CONTEXT ===============
-        // scan the "demo" package for components
-        SimpleApplicationContext appCtx = new SimpleApplicationContext("demo");
+        // The AppConfig class is used to configure the application context,
+        // it should be annotated with @ComponentScan to specify the packages to scan for components.
+        SimpleApplicationContext appCtx = new SimpleApplicationContext(AppConfig.class);
 
         // =============== RUN THE CONTEXT ===============
 

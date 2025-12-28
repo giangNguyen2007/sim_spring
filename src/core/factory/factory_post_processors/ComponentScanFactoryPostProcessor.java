@@ -13,6 +13,7 @@ import core.factory.SimpleBeanFactory;
 /**
  * BFPP: register BeanDefinitions discovered by scanning.
  */
+// regsiter into the bean factory all classes annotated with @Component in specified packages
 public class ComponentScanFactoryPostProcessor implements BeanFactoryPostProcessor {
 
     private final List<String> basePackages;

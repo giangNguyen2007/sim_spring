@@ -4,6 +4,7 @@ import core.BeanDefinition;
 import core.factory.factory_post_processors.AspectJAutoProxyRegistrarBFPP;
 import core.factory.factory_post_processors.BeanFactoryPostProcessor;
 import core.factory.SimpleBeanFactory;
+import core.factory.factory_post_processors.ComponentScanAnnotationFactoryPostProcessor;
 import core.factory.factory_post_processors.ComponentScanFactoryPostProcessor;
 
 import java.util.ArrayList;
@@ -17,9 +18,9 @@ public class SimpleApplicationContext {
     private final List<BeanFactoryPostProcessor> beanFactoryPostProcessorsList = new ArrayList<>();
     private boolean refreshed = false;
 
-    public SimpleApplicationContext(String... basePackages) {
+    public SimpleApplicationContext(Class<?> primarySource) {
         // Register scanning BFPP FIRST
-        beanFactoryPostProcessorsList.add(new ComponentScanFactoryPostProcessor(List.of(basePackages),
+        beanFactoryPostProcessorsList.add(new ComponentScanAnnotationFactoryPostProcessor(primarySource,
                 Thread.currentThread().getContextClassLoader()));
 
         // Later, you add other BFPPs (AOP aspect registrar, @Configuration parser, ...)
