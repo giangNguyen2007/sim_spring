@@ -3,6 +3,7 @@ package core.factory.factory_post_processors;
 import core.BeanDefinition;
 import core.annotations.Component;
 import core.annotations.ComponentScan;
+import core.annotations.Configuration;
 import core.context.BeanNameGenerator;
 import core.context.ClassPathScanner;
 import core.factory.SimpleBeanFactory;
@@ -25,6 +26,15 @@ public class ComponentScanAnnotationFactoryPostProcessor implements BeanFactoryP
 
     @Override
     public void postProcessBeanFactory(SimpleBeanFactory beanFactory) {
+
+        // check if primary source has @ComponentScan and @Configuration
+
+        if (!primarySource.isAnnotationPresent(Configuration.class)
+                || !primarySource.isAnnotationPresent(ComponentScan.class)) {
+            // If you want strict Spring-like behavior, throw here instead.
+            throw new IllegalArgumentException("Primary source must be @Configuration and @ComponentScan");
+        }
+
 
         // extract all base packages to scan
         List<String> basePackages = determineBasePackages(primarySource);

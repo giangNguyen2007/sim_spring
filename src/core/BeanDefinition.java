@@ -10,7 +10,7 @@ public class BeanDefinition {
     // two bean creation strategies:
     // default: instantiate by reflection from beanClass
     // optional: a Supplier<?> for factory-style beans
-    private final Supplier<?> supplier; // optional factory
+    private Supplier<?> supplier; // optional factory
 
     // lifecycle methods
     private String initMethod;  // => name of the initialization method defined in the bean class
@@ -34,6 +34,10 @@ public class BeanDefinition {
     public String getScope() { return scope; }
     public boolean isSingleton() { return "singleton".equals(scope); }
     public Supplier<?> getSupplier() { return supplier; }
+
+    public void setSupplier(Supplier<?> supplier) {
+        this.supplier = supplier;
+    }
 
     public String getInitMethod() { return initMethod; }
     public void setInitMethod(String initMethod) { this.initMethod = initMethod; }
